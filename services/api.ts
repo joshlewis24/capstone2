@@ -1,73 +1,76 @@
-import axios from 'axios';
-
-const dummyPartners = [
-  {
-    id: 123,
-    partnerName: "John Smith",
-    type: "Individual",
-    email: "john.smith@example.com",
-    contactNumber: "9876543210",
-    dateOfAgreement: "2024-04-10",
-    pan: "ABCDE1234F",
-  },
-  {
-    id: 124,
-    partnerName: "Acme Corporation",
-    type: "Corporate",
-    email: "contact@acme.example.com",
-    contactNumber: "9986776655",
-    dateOfAgreement: "2024-04-08",
-    pan: "FGHIJ5678K",
-  },
-  {
-    id: 125,
-    partnerName: "Jane Doe",
-    type: "Individual",
-    email: "jane.doe@example.com",
-    contactNumber: "9123456789",
-    dateOfAgreement: "2024-04-05",
-    pan: "KLMNO9012P",
-  },
-  {
-    id: 126,
-    partnerName: "Global Industries",
-    type: "Corporate",
-    email: "info@global.example.com",
-    contactNumber: "9234567890",
-    dateOfAgreement: "2024-04-02",
-    pan: "PQRST1234U",
-  },
-];
-
+import axios, { AxiosError } from 'axios';
+ 
+ 
+ 
 const api = axios.create({
-  baseURL: 'https://your-api-endpoint.com',
+  baseURL: process.env.NEXT_PUBLIC_API_BASE || 'http://192.168.254.54:8085',
+  headers: { 'Content-Type': 'application/json' },
+  timeout: 15000,
 });
+
+
+
+const formatAxiosError = (err: any) => {
+  if (axios.isAxiosError(err)) {
+    return {
+      message: err.message,
+      status: err.response?.status,
+      data: err.response?.data,
+      url: err.config?.url,
+      method: err.config?.method,
+    };
+  }
+  return { message: String(err) };
+};
 
 export default {
   post: async (url: string, data: any) => {
-    console.log(data);
-    const response = await api.post(url, data);
-    return response.data;
+    try {
+      const response = await api.post(url, data);
+      return response.data;
+    } catch (error) {
+      const info = formatAxiosError(error);
+      console.error('API POST Error:', info);
+      throw info;
+    }
   },
   get: async (url: string) => {
-    if (url === '/api/partners') {
-      return dummyPartners;
-    }
-    const idMatch = url.match(/\/api\/partners\/(\d+)/);
-    if (idMatch) {
-      const id = parseInt(idMatch[1], 10);
-      const partner = dummyPartners.find(p => p.id === id);
-      if (partner) {
-        return partner;
-      } else {
-        throw new Error('Partner not found');
-      }
-    }
-    const response = await api.get(url);
-    if (response.status === 200) {
+    try {
+      const response = await api.get(url);
       return response.data;
-    } else {
-      throw new Error('Failed to fetch partner details');
+    } catch (error) {
+      const info = formatAxiosError(error);
+      console.error('API GET Error:', info);
+      throw info;
+    }
+  },
+  patch: async (url: string, data: any) => {
+    try {
+      const response = await api.patch(url, data);
+      return response.data;
+    } catch (error) {
+      const info = formatAxiosError(error);
+      console.error('API PATCH Error:', info);
+      throw info;
+    }
+  },
+  listPartnerNames: async (): Promise<string[]> => {
+    try {
+      
+      const data = await api.get('/api/partner?page=0&size=500').then(r => r.data);
+      const raw = Array.isArray(data?.content)
+        ? data.content
+        : Array.isArray(data) ? data : [];
+      const names = raw
+        .map((p: any) => p?.partnerName)
+        .filter((n: any): n is string => typeof n === 'string' && n.trim().length > 0);
+      const unique = [...new Set(names)] as string[];
+      return unique.sort((a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+    } catch (error) {
+      const info = formatAxiosError(error);
+      console.error('API listPartnerNames Error:', info);
+      return [];
     }
   },
 };
+ 
